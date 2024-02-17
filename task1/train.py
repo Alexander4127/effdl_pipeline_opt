@@ -56,8 +56,8 @@ def train_epoch(
         scaler = DynamicScaler(scale_factor=scale_factor)
 
     precis = torch.float16 if precision == "half" else torch.float32
-    logging.info(f"Used precision {precis}")
-    logging.info(f"Used loss scaling: {loss_scaling}")
+    logging.warning(f"Used precision {precis}")
+    logging.warning(f"Used loss scaling: {loss_scaling}")
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for i, (images, labels) in pbar:
         images = images.to(device)
