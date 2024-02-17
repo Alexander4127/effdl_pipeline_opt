@@ -71,6 +71,7 @@ def train_epoch(
             scaler.scale(loss).backward()
             scaler.step(optimizer)
         else:
+            loss.backward()
             optimizer.step()
 
         accuracy = ((outputs > 0.5) == labels).float().mean()
