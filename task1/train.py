@@ -53,6 +53,9 @@ def train_epoch(
     elif loss_scaling == "dynamic":
         scaler = DynamicScaler(scale_factor=scale_factor)
 
+    if precision == "half":
+        model = model.half()
+
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for i, (images, labels) in pbar:
         images = images.to(device)
@@ -62,13 +65,12 @@ def train_epoch(
             outputs = model(images)
             loss = criterion(outputs, labels)
         else:
-            if precision == "half":
-                images = images.half()
-                labels = labels.half()
-
+            images = images.half()
+            labels = labels.half()
             with torch.cuda.amp.autocast():
                 outputs = model(images)
                 loss = criterion(outputs, labels)
+
         # code for loss scaling
         optimizer.zero_grad()
         if loss_scaling != "none":
