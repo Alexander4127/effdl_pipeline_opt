@@ -103,11 +103,11 @@ def train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("batch_size", type=int, default=32)
-    parser.add_argument("num_epochs", type=int, default=5)
-    parser.add_argument("precision", type=str, default="full")
-    parser.add_argument("loss_scaling", type=str, default="none")
-    parser.add_argument("scale_factor", type=float, default=128)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--num_epochs", type=int, default=5)
+    parser.add_argument("--precision", type=str, default="full")
+    parser.add_argument("--loss_scaling", type=str, default="none")
+    parser.add_argument("--scale_factor", type=float, default=128)
 
     args = parser.parse_args()
 
