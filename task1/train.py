@@ -65,7 +65,7 @@ def train_epoch(
             with torch.cuda.amp.autocast():
                 outputs = model(images)
                 loss = criterion(outputs, labels)
-        # TODO: your code for loss scaling here
+        # code for loss scaling
         if loss_scaling != "none":
             optimizer.zero_grad()
             scaler.scale(loss).backward()
@@ -76,8 +76,11 @@ def train_epoch(
         pbar.set_description(f"Loss: {round(loss.item(), 4)} " f"Accuracy: {round(accuracy.item() * 100, 4)}")
 
 
-def train(device: str = "cuda:0"):
-    device = torch.device(device)
+def train(
+        precision: Literal["full", "half"] = "full",
+        loss_scaling: Literal["none", "static", "dynamic"] = "none",
+        scale_factor: int = 128):
+    device = torch.device("cuda:0")
     model = Unet().to(device)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -86,4 +89,4 @@ def train(device: str = "cuda:0"):
 
     num_epochs = 5
     for epoch in range(0, num_epochs):
-        train_epoch(train_loader, model, criterion, optimizer, device=device)
+        train_epoch(train_loader, model, criterion, optimizer, device, precision, loss_scaling, scale_factor)
