@@ -77,6 +77,7 @@ def train_epoch(
 
 
 def train(
+        batch_size: int = 32,
         precision: Literal["full", "half"] = "full",
         loss_scaling: Literal["none", "static", "dynamic"] = "none",
         scale_factor: int = 128):
@@ -85,7 +86,7 @@ def train(
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    train_loader = get_train_data()
+    train_loader = get_train_data(batch_size)
 
     num_epochs = 5
     for epoch in range(0, num_epochs):
