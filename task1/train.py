@@ -66,10 +66,12 @@ def train_epoch(
                 outputs = model(images)
                 loss = criterion(outputs, labels)
         # code for loss scaling
+        optimizer.zero_grad()
         if loss_scaling != "none":
-            optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
+        else:
+            optimizer.step()
 
         accuracy = ((outputs > 0.5) == labels).float().mean()
 
