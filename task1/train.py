@@ -81,6 +81,7 @@ def train_epoch(
 
 def train(
         batch_size: int = 32,
+        num_epochs: int = 5,
         precision: Literal["full", "half"] = "full",
         loss_scaling: Literal["none", "static", "dynamic"] = "none",
         scale_factor: int = 128):
@@ -91,6 +92,5 @@ def train(
 
     train_loader = get_train_data(batch_size)
 
-    num_epochs = 5
     for epoch in range(0, num_epochs):
         train_epoch(train_loader, model, criterion, optimizer, device, precision, loss_scaling, scale_factor)
