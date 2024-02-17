@@ -33,7 +33,7 @@ class SimpleDataset(Dataset):
         self.vocab = build_vocab(self.data, self.tokenizer)
         for line in tqdm(self.data, desc="Tokenizing dataset"):
             line["tokens"] = torch.tensor(
-                [self.vocab[word] for word in ["<bos>"] + self.tokenizer(line["text"])[:max_length - 2] + ["<eos>"]]
+                self.vocab.forward(["<bos>"] + self.tokenizer(line["text"])[:max_length - 2] + ["<eos>"])
             )
 
     def __getitem__(self, item: int):
