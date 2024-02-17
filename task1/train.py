@@ -54,34 +54,26 @@ def train_epoch(
     elif loss_scaling == "dynamic":
         scaler = DynamicScaler(scale_factor=scale_factor)
 
+    precis = torch.float16 if precision == "half" else torch.float32
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for i, (images, labels) in pbar:
         images = images.to(device)
         labels = labels.to(device)
 
-        if precision == "full":
+        with torch.cuda.amp.autocast(dtype=precis):
             outputs = model(images)
             loss = criterion(outputs, labels)
-        else:
-            with torch.cuda.amp.autocast(dtype=torch.float16):
-                outputs = model(images)
-                loss = criterion(outputs, labels)
 
-        # code for loss scaling
-        optimizer.zero_grad()
-        if loss_scaling != "none":
-            if precision == "full":
+            # code for loss scaling
+            optimizer.zero_grad()
+            if loss_scaling != "none":
                 scaler.scale(loss).backward()
             else:
-                with torch.cuda.amp.autocast(dtype=torch.float16):
-                    scaler.scale(loss).backward()
+                loss.backward()
+
+        if loss_scaling != "none":
             scaler.step(optimizer)
         else:
-            if precision == "full":
-                loss.backward()
-            else:
-                with torch.cuda.amp.autocast(dtype=torch.float16):
-                    loss.backward()
             optimizer.step()
 
         accuracy = ((outputs > 0.5) == labels).float().mean()
