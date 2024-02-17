@@ -22,7 +22,7 @@ class Scaler:
                     continue
                 param.grad /= self.factor
                 if torch.isinf(param.grad).sum() > 0 or torch.isnan(param.grad).sum() > 0:
-                    logging.warning(f"Faced grad overflow with factor = {self.factor}")
+                    # logging.warning(f"Faced grad overflow with factor = {self.factor}")
                     return False
         optimizer.step()
         return True
