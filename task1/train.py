@@ -20,6 +20,7 @@ class Scaler:
             for param in group["params"]:
                 if param.grad is None:
                     continue
+                logging.info(f"Dtype of grads: {param.grad.dtype}")
                 param.grad = param.grad.to(torch.float32) / self.factor
                 if torch.isinf(param.grad).sum() > 0 or torch.isnan(param.grad).sum() > 0:
                     # logging.warning(f"Faced grad overflow with factor = {self.factor}")
@@ -69,10 +70,18 @@ def train_epoch(
         # code for loss scaling
         optimizer.zero_grad()
         if loss_scaling != "none":
-            scaler.scale(loss).backward()
+            if precision == "full":
+                scaler.scale(loss).backward()
+            else:
+                with torch.cuda.amp.autocast(dtype=torch.float16):
+                    scaler.scale(loss).backward()
             scaler.step(optimizer)
         else:
-            loss.backward()
+            if precision == "full":
+                loss.backward()
+            else:
+                with torch.cuda.amp.autocast(dtype=torch.float16):
+                    loss.backward()
             optimizer.step()
 
         accuracy = ((outputs > 0.5) == labels).float().mean()
