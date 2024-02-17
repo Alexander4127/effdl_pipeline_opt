@@ -5,6 +5,7 @@ from random import shuffle
 from typing import Optional
 
 from datasets import load_from_disk
+from tqdm.auto import tqdm
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data import Sampler
@@ -30,7 +31,7 @@ class SimpleDataset(Dataset):
         self.data = load_from_disk(data_path)
         self.tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
         self.vocab = build_vocab(self.data, self.tokenizer)
-        for line in self.data:
+        for line in tqdm(self.data, desc="Tokenizing dataset"):
             line["tokens"] = torch.tensor(
                 [self.vocab[word] for word in ["<bos>"] + self.tokenizer(line["text"])[:max_length - 2] + ["<eos>"]]
             )
