@@ -1,3 +1,4 @@
+import argparse
 import logging
 import torch
 from torch import nn
@@ -98,3 +99,16 @@ def train(
 
     for epoch in range(0, num_epochs):
         train_epoch(train_loader, model, criterion, optimizer, device, precision, loss_scaling, scale_factor)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("batch_size", type=int, default=32)
+    parser.add_argument("num_epochs", type=int, default=5)
+    parser.add_argument("precision", type=str, default="full")
+    parser.add_argument("loss_scaling", type=str, default="none")
+    parser.add_argument("scale_factor", type=float, default=128)
+
+    args = parser.parse_args()
+
+    train(args.batch_size, args.num_epochs, args.precision, args.loss_scaling, args.scale_factor)
