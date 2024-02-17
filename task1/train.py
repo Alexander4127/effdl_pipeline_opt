@@ -62,6 +62,10 @@ def train_epoch(
             outputs = model(images)
             loss = criterion(outputs, labels)
         else:
+            if precision == "half":
+                images = images.half()
+                labels = labels.half()
+
             with torch.cuda.amp.autocast():
                 outputs = model(images)
                 loss = criterion(outputs, labels)
