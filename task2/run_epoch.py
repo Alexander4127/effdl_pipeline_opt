@@ -71,3 +71,4 @@ if __name__ == "__main__":
     add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
     for k in [1, 5, 10, 20, 50]:
         add_result(run_epoch, f"Ultra Big Brain. k = {k}", df, data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k)
+    df.to_csv("result.csv")
