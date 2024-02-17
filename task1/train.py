@@ -10,7 +10,7 @@ from dataset import get_train_data
 
 
 class Scaler:
-    def __init__(self, scale_factor: int):
+    def __init__(self, scale_factor: float):
         self.factor = scale_factor
 
     def scale(self, loss: torch.Tensor):
@@ -30,10 +30,19 @@ class Scaler:
 
 
 class DynamicScaler(Scaler):
+    def __init__(self, scale_factor: float, max_steps: int = 2000):
+        super().__init__(scale_factor)
+        self._row_steps = 0
+        self.max_steps = max_steps
+
     def step(self, optimizer):
         if super().step(optimizer):
-            self.factor *= 2
+            self._row_steps += 1
+            if self._row_steps == self.max_steps:
+                self._row_steps = 0
+                self.factor *= 2
         else:
+            self._row_steps = 0
             self.factor /= 2
 
 
