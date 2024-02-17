@@ -21,8 +21,7 @@ class Scaler:
             for param in group["params"]:
                 if param.grad is None:
                     continue
-                logging.info(f"Dtype of grads: {param.grad.dtype}")
-                param.grad = param.grad.to(torch.float32) / self.factor
+                param.grad = param.grad / self.factor
                 if torch.isinf(param.grad).sum() > 0 or torch.isnan(param.grad).sum() > 0:
                     # logging.warning(f"Faced grad overflow with factor = {self.factor}")
                     return False
@@ -56,8 +55,6 @@ def train_epoch(
         scaler = DynamicScaler(scale_factor=scale_factor)
 
     precis = torch.float16 if precision == "half" else torch.float32
-    logging.warning(f"Used precision {precis}")
-    logging.warning(f"Used loss scaling: {loss_scaling}")
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for i, (images, labels) in pbar:
         images = images.to(device)
