@@ -40,6 +40,7 @@ class SimpleDataset(Dataset):
         if Path("upd_data.hf").exists():
             self.data = load_from_disk("upd_data.hf")
         else:
+            self.data = self.data.filter(lambda line: line["text"] != "" and hash(line["text"]) % 30 == 0)
             self.data = self.data.map(
                 lambda line: {
                     "tokens": self.vocab.forward(
