@@ -26,7 +26,7 @@ def get_vit_model() -> torch.nn.Module:
     return model
 
 
-def get_loaders(shuffle_train: bool) -> tp.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+def get_loaders() -> tp.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     dataset.download_extract_dataset()
     train_transforms = dataset.get_train_transforms()
     val_transforms = dataset.get_val_transforms()
@@ -45,8 +45,17 @@ def get_loaders(shuffle_train: bool) -> tp.Tuple[torch.utils.data.DataLoader, to
     print(f"Train Data: {len(train_data)}")
     print(f"Val Data: {len(val_data)}")
 
-    train_loader = DataLoader(dataset=train_data, batch_size=Settings.batch_size, shuffle=shuffle_train)
-    val_loader = DataLoader(dataset=val_data, batch_size=Settings.batch_size, shuffle=False)
+    train_loader = DataLoader(
+        dataset=train_data,
+        batch_size=Settings.batch_size,
+        shuffle=True
+    )
+
+    val_loader = DataLoader(
+        dataset=val_data,
+        batch_size=Settings.batch_size,
+        shuffle=False
+    )
 
     return train_loader, val_loader
 
@@ -65,7 +74,6 @@ def make_step(data, label, model, criterion, optimizer, is_train=True):
 
 
 def run_epoch(model, train_loader, val_loader, criterion, optimizer, prof=None) -> tp.Tuple[float, float]:
-    n_steps = len(train_loader) if prof is None else Settings.n_steps
     epoch_loss, epoch_accuracy = 0, 0
     val_loss, val_accuracy = 0, 0
     model.train()
@@ -93,7 +101,7 @@ def run_epoch(model, train_loader, val_loader, criterion, optimizer, prof=None) 
 def main():
     seed_everything()
     model = get_vit_model()
-    train_loader, val_loader = get_loaders(shuffle_train=False)
+    train_loader, val_loader = get_loaders()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=Settings.lr)
 
@@ -127,9 +135,9 @@ def main():
         record_shapes=True,
         profile_memory=True,
         with_stack=True
-    ) as prof_3:
+    ) as prof:
         with record_function("several_iter"):
-            run_epoch(model, train_loader, val_loader, criterion, optimizer, prof_3)
+            run_epoch(model, train_loader, val_loader, criterion, optimizer, prof)
 
 
 if __name__ == "__main__":
