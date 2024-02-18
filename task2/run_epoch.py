@@ -19,15 +19,24 @@ class DataMode(Enum):
     ULTRA_DUPER_BIG_BRAIN = 3
 
 
-def get_gpt2_model(dataset: SimpleDataset, d_model: int = 1024, nhead: int = 8) -> torch.nn.Module:
-    return nn.Sequential(
-        nn.Embedding(num_embeddings=len(dataset.vocab), embedding_dim=d_model, padding_idx=0),
-        PositionalEncoding(d_model, max_len=dataset.max_length),
-        nn.TransformerDecoderLayer(d_model=d_model, nhead=nhead)
-    )
+def get_model(dataset: SimpleDataset, d_model: int = 1024, nhead: int = 8) -> torch.nn.Module:
+    class GPT2Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.d_model = d_model
+            self.embed = nn.Embedding(num_embeddings=len(dataset.vocab), embedding_dim=d_model, padding_idx=0)
+            self.pos_enc = PositionalEncoding(d_model, max_len=dataset.max_length)
+            self.decoder = nn.TransformerDecoderLayer(d_model=d_model, nhead=nhead)
+
+        def forward(self, seqs: torch.Tensor) -> torch.Tensor:
+            embeds = self.embed(seqs)
+            pos_enc = self.pos_enc(embeds)
+            return self.decoder(pos_enc, pos_enc)
+
+    return GPT2Model()
 
 
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 
 
 def run_epoch(
@@ -47,11 +56,11 @@ def run_epoch(
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     loader = dataset.create_loader(batch_size=BATCH_SIZE)
     init_time = time.time() - start
-    model = get_gpt2_model(dataset).to()
+    model = get_model(dataset).to(device)
     times = []
-    for batch in tqdm(loader, desc=f"{DataMode}-{k}"):
+    for seqs in tqdm(loader, desc=f"{data_mode.name}-{k}"):
         start = time.time()
-        outputs = model(batch.to(device))
+        outputs = model(seqs.to(device))
         if device != "cpu":
             torch.cuda.synchronize()
         times.append(time.time() - start)
@@ -69,6 +78,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(columns=["Init", "Min", "Max", "Mean", "Med"])
     add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
     add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
-    for k in [1, 5, 10, 20, 50]:
+    for k in [1, 5, 10, 20, 50, 640]:
         add_result(run_epoch, f"Ultra Big Brain. k = {k}", df, data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k)
     df.to_csv("result.csv")

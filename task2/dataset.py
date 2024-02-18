@@ -1,6 +1,8 @@
 from abc import abstractmethod
 from collections import Counter, defaultdict
+import json
 import numpy as np
+from pathlib import Path
 from random import shuffle
 from typing import Optional
 
@@ -20,7 +22,7 @@ def build_vocab(data, tokenizer):
     counter = Counter()
     for line in data:
         counter.update(tokenizer(line["text"]))
-    vocab = Vocab(counter, specials=['<pad>', '<unk>', '<bos>', '<eos>'])
+    vocab = Vocab(counter, min_freq=2000, specials=['<pad>', '<unk>', '<bos>', '<eos>'])
     vocab.set_default_index(vocab['<unk>'])
     return vocab
 
@@ -30,14 +32,26 @@ class SimpleDataset(Dataset):
         self.max_length = max_length
         self.data = load_from_disk(data_path)
         self.tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
-        self.vocab = build_vocab(self.data, self.tokenizer)
-        for line in tqdm(self.data, desc="Tokenizing dataset"):
-            line["tokens"] = torch.tensor(
-                self.vocab.forward(["<bos>"] + self.tokenizer(line["text"])[:max_length - 2] + ["<eos>"])
+        if Path("vocab.pth").exists():
+            self.vocab = torch.load("vocab.pth")
+        else:
+            self.vocab = build_vocab(self.data, self.tokenizer)
+            torch.save(self.vocab, "vocab.pth")
+        if Path("upd_data.hf").exists():
+            self.data = load_from_disk("upd_data.hf")
+        else:
+            self.data = self.data.map(
+                lambda line: {
+                    "tokens": self.vocab.forward(
+                        ["<bos>"] + self.tokenizer(line["text"])[:max_length - 2] + ["<eos>"]
+                    ),
+                    "text": line["text"]
+                }
             )
+            self.data.save_to_disk("upd_data.hf")
 
     def __getitem__(self, item: int):
-        return self.data[item]["tokens"]
+        return torch.tensor(self.data[item]["tokens"])
 
     def __len__(self):
         return len(self.data)
@@ -70,7 +84,7 @@ class UltraDuperBigBrainDataset(SimpleDataset):
 
     def __getitem__(self, lst_idx: list[int]):
         assert type(lst_idx) == list, f'Unexpected type of lst_idx = {type(lst_idx)}'
-        return [self.data[idx]["tokens"] for idx in lst_idx]
+        return [torch.tensor(self.data[idx]["tokens"]) for idx in lst_idx]
 
     def create_loader(self, batch_size):
         sampler = UltraDuperBigBrainBatchSampler(self, batch_size, self.k)
@@ -93,7 +107,7 @@ class Collator:
         """
         lengths = torch.tensor([len(seq) for seq in batch])
         max_length = self.max_length if self.max_length is not None else max(lengths)
-        seqs = torch.zeros([max_length, len(batch)])
+        seqs = torch.zeros([max_length, len(batch)], dtype=torch.int32)
         for idx, seq in enumerate(batch):
             seqs[:len(seq), idx] = seq
         return seqs
