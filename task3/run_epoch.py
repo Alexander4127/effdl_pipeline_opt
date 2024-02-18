@@ -1,3 +1,4 @@
+import argparse
 import typing as tp
 
 import torch
@@ -26,7 +27,8 @@ def get_vit_model() -> torch.nn.Module:
     return model
 
 
-def get_loaders() -> tp.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+def get_loaders(n_workers: int, pin_memory: bool) -> \
+        tp.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     dataset.download_extract_dataset()
     train_transforms = dataset.get_train_transforms()
     val_transforms = dataset.get_val_transforms()
@@ -48,13 +50,17 @@ def get_loaders() -> tp.Tuple[torch.utils.data.DataLoader, torch.utils.data.Data
     train_loader = DataLoader(
         dataset=train_data,
         batch_size=Settings.batch_size,
-        shuffle=True
+        shuffle=True,
+        num_workers=n_workers,
+        pin_memory=pin_memory
     )
 
     val_loader = DataLoader(
         dataset=val_data,
         batch_size=Settings.batch_size,
-        shuffle=False
+        shuffle=False,
+        num_workers=n_workers,
+        pin_memory=pin_memory
     )
 
     return train_loader, val_loader
@@ -65,7 +71,7 @@ def make_step(data, label, model, criterion, optimizer, is_train=True):
     label = label.to(Settings.device)
     output = model(data)
     loss = criterion(output, label)
-    acc = (output.argmax(dim=1) == label).float().mean()
+    acc = torch.mean(output.argmax(dim=1) == label, dtype=torch.float32)
     if is_train:
         optimizer.zero_grad()
         loss.backward()
@@ -90,55 +96,38 @@ def run_epoch(model, train_loader, val_loader, criterion, optimizer, prof=None) 
         return epoch_loss, epoch_accuracy
 
     model.eval()
-    for data, label in tqdm(val_loader, desc="Val"):
-        loss, acc = make_step(data, label, model, criterion, optimizer, is_train=False)
-        val_accuracy += acc.item() / len(train_loader)
-        val_loss += loss.item() / len(train_loader)
+    with torch.inference_mode():
+        for data, label in tqdm(val_loader, desc="Val"):
+            loss, acc = make_step(data, label, model, criterion, optimizer, is_train=False)
+            val_accuracy += acc.item() / len(train_loader)
+            val_loss += loss.item() / len(train_loader)
 
     return epoch_loss, epoch_accuracy, val_loss, val_accuracy
 
 
-def main():
+def main(name: str, n_workers: int, pin_memory: bool):
     seed_everything()
     model = get_vit_model()
-    train_loader, val_loader = get_loaders()
+    train_loader, val_loader = get_loaders(n_workers, pin_memory)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=Settings.lr)
 
-    # data, label = next(iter(train_loader))
-    # with profile(
-    #     schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-    #     on_trace_ready=torch.profiler.tensorboard_trace_handler("./log/forward"),
-    #     record_shapes=True,
-    #     profile_memory=True,
-    #     with_stack=True
-    # ) as prof_1:
-    #     with record_function("model_forward"):
-    #         data = data.to(Settings.device)
-    #         label = label.to(Settings.device)
-    #         output = model(data)
-    #         loss = criterion(output, label)
-    #
-    # with profile(
-    #     schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-    #     on_trace_ready=torch.profiler.tensorboard_trace_handler("./log/backward"),
-    #     record_shapes=True,
-    #     profile_memory=True,
-    #     with_stack=True
-    # ) as prof_2:
-    #     with record_function("model_backward"):
-    #         loss.backward()
-
     with profile(
-        schedule=torch.profiler.schedule(wait=1, warmup=1, active=1, repeat=1),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler("./log/several_iter"),
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler(f"./log/{name}"),
         record_shapes=True,
         profile_memory=True,
         with_stack=True
     ) as prof:
-        with record_function("several_iter"):
-            run_epoch(model, train_loader, val_loader, criterion, optimizer, prof)
+        run_epoch(model, train_loader, val_loader, criterion, optimizer, prof)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--name", type=str)
+    parser.add_argument("--n_workers", default=5, type=int)
+    parser.add_argument("--pin_memory", default=True, type=bool)
+
+    args = parser.parse_args()
+    main(args.name, args.n_workers, args.pin_memory)

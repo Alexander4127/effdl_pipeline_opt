@@ -29,7 +29,7 @@ class Settings:
     device: str = get_device()
     train_frac: float = 0.8
 
-    n_steps: int = 3
+    n_steps: int = 5
 
 
 class Clothes:

@@ -16,14 +16,22 @@ def pair(t):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim=255, dropout=0.0):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.LayerNorm(dim),
-            nn.Linear(dim, hidden_dim, bias=True),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim, bias=True),
-            nn.Dropout(dropout),
-        )
+        if dropout > 0.0:
+            self.net = nn.Sequential(
+                nn.LayerNorm(dim),
+                nn.Linear(dim, hidden_dim, bias=True),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, dim, bias=True),
+                nn.Dropout(dropout),
+            )
+        else:
+            self.net = nn.Sequential(
+                nn.LayerNorm(dim),
+                nn.Linear(dim, hidden_dim, bias=True),
+                nn.GELU(),
+                nn.Linear(hidden_dim, dim, bias=True)
+            )
 
     def forward(self, x):
         return self.net(x)
@@ -39,7 +47,9 @@ class Attention(nn.Module):
         self.scale = dim_head ** (-0.5)
 
         self.attend = nn.Softmax(dim=-1)
-        self.dropout = nn.Dropout(dropout)
+        self.use_dropout = dropout > 0.0
+        if self.use_dropout:
+            self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(dim)
         self.queries = nn.Linear(dim, inner_dim, bias=False)
         self.keys = nn.Linear(dim, inner_dim, bias=False)
@@ -55,7 +65,8 @@ class Attention(nn.Module):
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
         attn = self.attend(dots)
-        attn = self.dropout(attn)
+        if self.use_dropout:
+            attn = self.dropout(attn)
 
         out = torch.matmul(attn, v)
 
@@ -118,12 +129,13 @@ class ViT(nn.Module):
 
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
-        self.dropout = nn.Dropout(emb_dropout)
+        self.use_dropout = emb_dropout > 0.0
+        if self.use_dropout:
+            self.dropout = nn.Dropout(emb_dropout)
 
         self.transformer = Transformer(dim, depth, heads, dim_head, dropout=dropout)
 
         self.pool = pool
-        self.to_latent = nn.Identity()
 
         self.mlp_head = nn.Sequential(nn.BatchNorm1d(dim), nn.Linear(dim, num_classes))
 
@@ -131,17 +143,17 @@ class ViT(nn.Module):
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
 
-        cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
+        # cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
+        cls_tokens = self.cls_token.repeat((b, 1, 1))
         x = torch.cat((cls_tokens, x), dim=1)
         x += self.pos_embedding[:, : (n + 1)]
 
-        x = self.dropout(x)
+        if self.use_dropout:
+            x = self.dropout(x)
 
         x = self.transformer(x)
 
         x = x.mean(dim=1) if self.pool == "mean" else x[:, 0]
-
-        x = self.to_latent(x)
 
         output = self.mlp_head(x)
         return output
