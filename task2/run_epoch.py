@@ -55,15 +55,20 @@ def run_epoch(
     loader = dataset.create_loader(batch_size=batch_size)
     init_time = time.time() - start
     model = get_model(dataset).to(device)
-    times = []
-    for seqs in tqdm(loader, desc=f"{data_mode.name}-{k}"):
+    times, seqs_len, seqs_diff = [], [], []
+    for seqs, seqs_len_ in tqdm(loader, desc=f"{data_mode.name}-{k}"):
+        seqs_len += seqs_len_
+        seqs_diff.append(max(seqs_len_) - min(seqs_len_))
         start = time.time()
         outputs = model(seqs.to(device))
         if device != "cpu":
             torch.cuda.synchronize()
         times.append(time.time() - start)
     times = times[warmup_steps:]
-    return [init_time, np.minimum(times), np.maximum(times), np.mean(times), np.median(times)]
+    return [
+        init_time, np.min(times), np.max(times), np.mean(times), np.median(times),
+        np.mean(seqs_len[warmup_steps:]), np.mean(seqs_diff[warmup_steps:])
+    ]
 
 
 def add_result(foo, desc, df, **kwargs):
@@ -77,9 +82,9 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", default=32, type=int)
     args = parser.parse_args()
 
-    df = pd.DataFrame(columns=["Init", "Min", "Max", "Mean", "Med"])
-    # add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
-    # add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
+    df = pd.DataFrame(columns=["Init", "Min", "Max", "Mean", "Med", "SeqLen", "SeqDiff"])
+    add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
+    add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
     for k in [1, 5, 10, 20, 50, 640]:
         add_result(run_epoch, f"Ultra Big Brain. k = {k}", df,
                    data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k, batch_size=args.batch_size)

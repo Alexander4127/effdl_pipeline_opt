@@ -4,7 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 from random import shuffle
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from datasets import load_from_disk
 from tqdm.auto import tqdm
@@ -51,7 +51,7 @@ class SimpleDataset(Dataset):
             self.data.save_to_disk("upd_data.hf")
 
     def __getitem__(self, item: int):
-        return torch.tensor(self.data[item]["tokens"])
+        return torch.tensor(self.data[int(item)]["tokens"])
 
     def __len__(self):
         return len(self.data)
@@ -66,7 +66,7 @@ class BrainDataset(SimpleDataset):
         super().__init__(data_path, max_length)
 
     def create_loader(self, batch_size):
-        return DataLoader(self, batch_size=batch_size, collate_fn=Collator(max_length=self.max_length))
+        return DataLoader(self, batch_size=batch_size, collate_fn=Collator(max_length=self.max_length), shuffle=True)
 
 
 class BigBrainDataset(SimpleDataset):
@@ -74,17 +74,13 @@ class BigBrainDataset(SimpleDataset):
         super().__init__(data_path, max_length)
 
     def create_loader(self, batch_size):
-        return DataLoader(self, batch_size=batch_size, collate_fn=Collator(max_length=None))
+        return DataLoader(self, batch_size=batch_size, collate_fn=Collator(max_length=None), shuffle=True)
 
 
 class UltraDuperBigBrainDataset(SimpleDataset):
     def __init__(self, data_path: str, max_length: int = MAX_LENGTH, k: int = 1):
         super().__init__(data_path, max_length)
         self.k = k
-
-    def __getitem__(self, lst_idx: list[int]):
-        assert type(lst_idx) == list, f'Unexpected type of lst_idx = {type(lst_idx)}'
-        return [torch.tensor(self.data[idx]["tokens"]) for idx in lst_idx]
 
     def create_loader(self, batch_size):
         sampler = UltraDuperBigBrainBatchSampler(self, batch_size, self.k)
@@ -99,35 +95,40 @@ class Collator:
         """
         self.max_length = max_length
 
-    def __call__(self, batch: list[torch.Tensor]):
+    def __call__(self, batch: list[torch.Tensor]) -> Tuple[torch.Tensor, List[int]]:
         """
             Pad each sequence of the incoming sequences list
             :param batch: a list of the objects received from the dataset by __getitem__
             :return: padded sequences
         """
-        lengths = torch.tensor([len(seq) for seq in batch])
+        lengths = [len(seq) for seq in batch]
         max_length = self.max_length if self.max_length is not None else max(lengths)
         seqs = torch.zeros([max_length, len(batch)], dtype=torch.int32)
         for idx, seq in enumerate(batch):
             seqs[:len(seq), idx] = seq
-        return seqs
+        return seqs, lengths
 
 
 class UltraDuperBigBrainBatchSampler(Sampler):
     def __init__(self, dataset: SimpleDataset, batch_size: int, k: int):
         super().__init__(dataset)
-        self.length_mapper = defaultdict(set)
+        self.length_mapper = defaultdict(list)
         self.batch_size = batch_size
-        for idx, line in enumerate(dataset.data):
-            self.length_mapper[len(line["tokens"])].add(idx)
+        if Path("agg.json").exists():
+            with open("agg.json", "r") as file:
+                self.length_mapper = json.load(file)
+            self.length_mapper = {int(k): v for k, v in self.length_mapper.items()}
+        else:
+            for idx, line in enumerate(tqdm(dataset.data, desc="Aggregating seq lengths")):
+                self.length_mapper[len(line["tokens"])].append(idx)
+            with open("agg.json", "w") as file:
+                json.dump(self.length_mapper, file)
 
-        for length in self.length_mapper.keys():
-            for tmp_len in range(length - k + 1, length):
+        for length in sorted(self.length_mapper.keys()):
+            for tmp_len in range(length - k, length):
                 if tmp_len in self.length_mapper:
-                    assert len(self.length_mapper[tmp_len] & self.length_mapper[length]) == 0
-                    self.length_mapper[tmp_len] |= self.length_mapper[length]
-
-        self.length_mapper = {k_: list(v) for k_, v in self.length_mapper.items()}
+                    assert len(set(self.length_mapper[tmp_len]) & set(self.length_mapper[length])) == 0
+                    self.length_mapper[tmp_len] += self.length_mapper[length]
 
     def __len__(self):
         return len(self.length_mapper)
