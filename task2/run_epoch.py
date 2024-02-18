@@ -24,7 +24,11 @@ def get_model(dataset: SimpleDataset, d_model: int = 1024, nhead: int = 8) -> to
         def __init__(self):
             super().__init__()
             self.d_model = d_model
-            self.embed = nn.Embedding(num_embeddings=len(dataset.vocab), embedding_dim=d_model, padding_idx=0)
+            self.embed = nn.Embedding(
+                num_embeddings=len(dataset.vocab),
+                embedding_dim=d_model,
+                padding_idx=dataset.vocab["<pad>"]
+            )
             self.pos_enc = PositionalEncoding(d_model, max_len=dataset.max_length)
             self.decoder = nn.TransformerDecoderLayer(d_model=d_model, nhead=nhead)
 
