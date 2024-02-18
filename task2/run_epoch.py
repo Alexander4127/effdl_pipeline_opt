@@ -87,8 +87,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = pd.DataFrame(columns=["Init", "Min", "Max", "Mean", "Med", "SeqLen", "SeqDiff"])
-    add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
-    add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BIG_BRAIN)
+    add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN, batch_size=args.batch_size)
+    add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BIG_BRAIN, batch_size=args.batch_size)
     for k in [1, 5, 10, 20, 50, 640]:
         add_result(run_epoch, f"Ultra Big Brain. k = {k}", df,
                    data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k, batch_size=args.batch_size)
