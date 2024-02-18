@@ -1,5 +1,5 @@
+import argparse
 from enum import Enum
-import json
 import numpy as np
 import pandas as pd
 import time
@@ -36,12 +36,10 @@ def get_model(dataset: SimpleDataset, d_model: int = 1024, nhead: int = 8) -> to
     return GPT2Model()
 
 
-BATCH_SIZE = 32
-
-
 def run_epoch(
         data_mode: DataMode,
         data_path: str = "data.hf",
+        batch_size: int = 32,
         k: Optional[int] = None,
         warmup_steps: int = 150) -> list:
     start = time.time()
@@ -54,7 +52,7 @@ def run_epoch(
         dataset = UltraDuperBigBrainDataset(data_path, k=k)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    loader = dataset.create_loader(batch_size=BATCH_SIZE)
+    loader = dataset.create_loader(batch_size=batch_size)
     init_time = time.time() - start
     model = get_model(dataset).to(device)
     times = []
@@ -75,9 +73,14 @@ def add_result(foo, desc, df, **kwargs):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--batch_size", default=32, type=int)
+    args = parser.parse_args()
+
     df = pd.DataFrame(columns=["Init", "Min", "Max", "Mean", "Med"])
-    add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
-    add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
+    # add_result(run_epoch, "Brain", df, data_mode=DataMode.BRAIN)
+    # add_result(run_epoch, "Big Brain", df, data_mode=DataMode.BRAIN)
     for k in [1, 5, 10, 20, 50, 640]:
-        add_result(run_epoch, f"Ultra Big Brain. k = {k}", df, data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k)
+        add_result(run_epoch, f"Ultra Big Brain. k = {k}", df,
+                   data_mode=DataMode.ULTRA_DUPER_BIG_BRAIN, k=k, batch_size=args.batch_size)
     df.to_csv("result.csv")
