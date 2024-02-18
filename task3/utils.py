@@ -29,6 +29,8 @@ class Settings:
     device: str = get_device()
     train_frac: float = 0.8
 
+    n_steps: int = 10
+
 
 class Clothes:
     directory = "data"
